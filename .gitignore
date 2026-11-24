@@ -1,0 +1,12 @@
+/target
+Cargo.lock
+data/
+isos/*.iso
+isos/*.img
+tftp/downloads/
+*.db
+*.db-journal
+*.log
+.env
+.DS_Store
+Thumbs.db

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PxeWebUI - Network Boot & ISO Manager</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%230ea5e9%22><path d=%22M4 6h16v10H4zM2 4v14h20V4zm7 16h6v2H9z%22/></svg>">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0b0f17',
+                        cardbg: '#111827',
+                        bordercolor: '#1f2937',
+                        accent: '#0ea5e9',
+                        accenthover: '#0284c7',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0b0f17; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-darkbg text-slate-200 min-h-screen flex flex-col font-sans antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="glass-panel sticky top-0 z-40 border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                    <i data-lucide="server" class="w-5 h-5 text-white"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-lg text-white tracking-tight">PxeWebUI</span>
+                        <span class="px-2 py-0.5 text-xs font-semibold bg-sky-950 text-sky-400 border border-sky-800/60 rounded-full">v1.0</span>
+                        <span class="flex items-center space-x-1.5 px-2 py-0.5 text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800/50 rounded-full">
+                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span>PXE Active</span>
+                        </span>
+                    </div>
+                    <div class="text-xs text-gray-400 flex items-center space-x-2">
+                        <span>Server IP: <span id="headerServerIp" class="text-sky-300 font-mono">192.168.1.100</span></span>
+                        <span>•</span>
+                        <span>ProxyDHCP: <span id="headerProxyDhcp" class="text-emerald-400 font-medium">Enabled</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telemetry & Actions -->
+            <div class="flex items-center space-x-4">
+                <!-- System Resource Badges -->
+                <div class="hidden md:flex items-center space-x-3 text-xs bg-gray-900/80 px-3 py-1.5 rounded-lg border border-gray-800">
+                    <div class="flex items-center space-x-1.5">
+                        <i data-lucide="cpu" class="w-3.5 h-3.5 text-gray-400"></i>
+                        <span>CPU:</span>
+                        <span id="statCpu" class="font-mono text-gray-200">0%</span>
+                    </div>
+                    <div class="h-3 w-px bg-gray-700"></div>
+                    <div class="flex items-center space-x-1.5">
+                        <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-gray-400"></i>
+                        <span>Disk:</span>
+                        <span id="statDisk" class="font-mono text-gray-200">-- GB free</span>
+                    </div>
+                </div>
+
+                <!-- Add ISO Button -->
+                <button onclick="openAddIsoModal()" class="flex items-center space-x-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white px-3.5 py-1.5 rounded-lg font-medium text-sm shadow-md shadow-sky-600/20 transition duration-150">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Add ISO</span>
+                </button>
+
+                <!-- User & Auth Menu -->
+                <div class="relative">
+                    <button id="userMenuBtn" onclick="toggleUserDropdown()" class="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 px-3 py-1.5 rounded-lg text-sm text-gray-300">
+                        <div class="h-6 w-6 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs" id="userAvatar">A</div>
+                        <span id="currentUsername" class="font-medium">Admin</span>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+                    </button>
+                    <!-- Dropdown -->
+                    <div id="userDropdown" class="hidden absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl py-1 z-50">
+                        <div class="px-4 py-2 border-b border-gray-800">
+                            <p class="text-xs text-gray-400">Signed in as</p>
+                            <p id="dropdownUsername" class="text-sm font-semibold text-white">Admin</p>
+                            <span id="dropdownRole" class="text-[10px] uppercase font-bold text-sky-400 tracking-wider">ADMINISTRATOR</span>
+                        </div>
+                        <button onclick="switchTab('users')" class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 flex items-center space-x-2">
+                            <i data-lucide="users" class="w-4 h-4 text-gray-400"></i>
+                            <span>User Accounts</span>
+                        </button>
+                        <button onclick="switchTab('settings')" class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 flex items-center space-x-2">
+                            <i data-lucide="settings" class="w-4 h-4 text-gray-400"></i>
+                            <span>Server Settings</span>
+                        </button>
+                        <div class="border-t border-gray-800 my-1"></div>
+                        <button onclick="logout()" class="w-full text-left px-4 py-2 text-sm text-rose-400 hover:bg-rose-950/40 flex items-center space-x-2">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            <span>Sign Out</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs Bar -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-4 border-t border-gray-800/60 overflow-x-auto text-sm font-medium">
+            <button onclick="switchTab('isos')" id="tab-btn-isos" class="nav-tab active-tab flex items-center space-x-2 py-3 px-3 border-b-2 border-sky-500 text-sky-400">
+                <i data-lucide="disc" class="w-4 h-4"></i>
+                <span>ISO Library</span>
+                <span id="isoCountBadge" class="bg-sky-950 text-sky-400 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+            </button>
+            <button onclick="switchTab('downloads')" id="tab-btn-downloads" class="nav-tab flex items-center space-x-2 py-3 px-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                <span>Active Downloads</span>
+                <span id="downloadCountBadge" class="hidden bg-amber-950 text-amber-400 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+            </button>
+            <button onclick="switchTab('preview')" id="tab-btn-preview" class="nav-tab flex items-center space-x-2 py-3 px-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                <i data-lucide="terminal" class="w-4 h-4"></i>
+                <span>PXE Boot Preview</span>
+            </button>
+            <button onclick="switchTab('logs')" id="tab-btn-logs" class="nav-tab flex items-center space-x-2 py-3 px-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                <i data-lucide="activity" class="w-4 h-4"></i>
+                <span>Client Boot Logs</span>
+            </button>
+            <button onclick="switchTab('users')" id="tab-btn-users" class="nav-tab flex items-center space-x-2 py-3 px-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Users</span>
+            </button>
+            <button onclick="switchTab('settings')" id="tab-btn-settings" class="nav-tab flex items-center space-x-2 py-3 px-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                <i data-lucide="sliders" class="w-4 h-4"></i>
+                <span>Settings</span>
+            </button>
+            <button onclick="switchTab('guide')" id="tab-btn-guide" class="nav-tab flex items-center space-x-2 py-3 px-3 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+                <i data-lucide="help-circle" class="w-4 h-4"></i>
+                <span>Setup Guide</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- TAB 1: ISO LIBRARY -->
+        <section id="tab-isos" class="space-y-6">
+            <!-- Filter & Search Toolbar -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-cardbg p-4 rounded-xl border border-gray-800">
+                <!-- Search input -->
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3 text-gray-500"></i>
+                    <input type="text" id="searchInput" oninput="filterIsos()" placeholder="Search ISOs by title, filename or description..." class="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-sky-500">
+                </div>
+                <!-- Category Pills -->
+                <div class="flex items-center space-x-1 overflow-x-auto text-xs font-medium">
+                    <button onclick="setCategoryFilter('all')" class="cat-pill active-pill px-3 py-1.5 rounded-lg bg-sky-600 text-white">All</button>
+                    <button onclick="setCategoryFilter('linux')" class="cat-pill px-3 py-1.5 rounded-lg bg-gray-900 text-gray-400 hover:text-gray-200 border border-gray-800">Linux</button>
+                    <button onclick="setCategoryFilter('windows')" class="cat-pill px-3 py-1.5 rounded-lg bg-gray-900 text-gray-400 hover:text-gray-200 border border-gray-800">Windows</button>
+                    <button onclick="setCategoryFilter('hypervisor')" class="cat-pill px-3 py-1.5 rounded-lg bg-gray-900 text-gray-400 hover:text-gray-200 border border-gray-800">Hypervisors</button>
+                    <button onclick="setCategoryFilter('utility')" class="cat-pill px-3 py-1.5 rounded-lg bg-gray-900 text-gray-400 hover:text-gray-200 border border-gray-800">Utilities</button>
+                </div>
+            </div>
+
+            <!-- ISO Cards Grid -->
+            <div id="isoCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Injected via JavaScript -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="isoEmptyState" class="hidden text-center py-16 bg-cardbg rounded-2xl border border-dashed border-gray-800">
+                <div class="h-16 w-16 mx-auto rounded-2xl bg-sky-500/10 flex items-center justify-center text-sky-400 mb-4">
+                    <i data-lucide="disc" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-white">No ISO images found</h3>
+                <p class="text-sm text-gray-400 max-w-md mx-auto mt-1 mb-6">
+                    Add your first ISO by downloading directly from external URLs (like Ubuntu, Debian, Proxmox) or uploading from your computer.
+                </p>
+                <div class="flex justify-center space-x-3">
+                    <button onclick="openAddIsoModal('download')" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2">
+                        <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                        <span>Download from Presets</span>
+                    </button>
+                    <button onclick="openAddIsoModal('upload')" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        <span>Upload File</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: ACTIVE DOWNLOADS -->
+        <section id="tab-downloads" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-bold text-white">External ISO Download Manager</h2>
+                    <p class="text-xs text-gray-400">Track and manage background downloads directly from official mirror links.</p>
+                </div>
+                <button onclick="openAddIsoModal('download')" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>New Download</span>
+                </button>
+            </div>
+
+            <div id="downloadsList" class="space-y-4">
+                <!-- Download Cards dynamically populated -->
+            </div>
+        </section>
+
+        <!-- TAB 3: PXE BOOT SCRIPT & SIMULATOR -->
+        <section id="tab-preview" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Terminal CRT Boot Menu Simulator -->
+                <div class="bg-black rounded-xl border border-gray-800 p-5 font-mono text-sm shadow-2xl relative overflow-hidden flex flex-col h-[520px]">
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="h-3 w-3 rounded-full bg-rose-500"></span>
+                            <span class="h-3 w-3 rounded-full bg-amber-500"></span>
+                            <span class="h-3 w-3 rounded-full bg-emerald-500"></span>
+                            <span class="text-xs text-gray-400 font-sans ml-2">iPXE Client Screen (What PXE Client Sees)</span>
+                        </div>
+                        <span class="text-xs text-emerald-400">UEFI / BIOS Ready</span>
+                    </div>
+
+                    <div id="crtScreen" class="flex-1 overflow-y-auto text-sky-400 space-y-2 leading-relaxed text-xs">
+                        <p class="text-slate-400">iPXE 1.21.1+ -- Open Source Network Boot Firmware -- http://ipxe.org</p>
+                        <p class="text-slate-400">Features: DNS TFTP HTTP HTTPS iSCSI SANBOOT COMBOOT ELF</p>
+                        <p class="text-white mt-2">Configuring (net0 52:54:00:12:34:56)... ok</p>
+                        <p class="text-emerald-400">ProxyDHCP offer received from <span class="sim-ip">192.168.1.100</span></p>
+                        <p class="text-sky-300">Fetching http://<span class="sim-ip">192.168.1.100</span>:8080/boot.ipxe... ok</p>
+                        <div class="border border-sky-800/60 rounded bg-sky-950/30 p-3 my-2 text-white">
+                            <p class="font-bold text-center text-sky-300 mb-2" id="simMenuTitle">PxeWebUI - Network Boot Environment</p>
+                            <div id="simMenuItems" class="space-y-1 text-slate-300 pl-2">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <p class="text-amber-400">Default choice boots in <span id="simTimeout">10</span> seconds...</p>
+                    </div>
+                </div>
+
+                <!-- Dynamic boot.ipxe code viewer -->
+                <div class="bg-cardbg rounded-xl border border-gray-800 p-5 flex flex-col h-[520px]">
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-3">
+                        <h3 class="font-bold text-white text-sm flex items-center space-x-2">
+                            <i data-lucide="code" class="w-4 h-4 text-sky-400"></i>
+                            <span>Generated <code class="text-sky-300 font-mono">boot.ipxe</code></span>
+                        </h3>
+                        <div class="flex items-center space-x-2">
+                            <a id="rawIpxeLink" href="/boot.ipxe" target="_blank" class="text-xs bg-gray-800 hover:bg-gray-700 text-sky-400 px-2.5 py-1 rounded flex items-center space-x-1">
+                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                                <span>Open Raw</span>
+                            </a>
+                            <button onclick="copyIpxeUrl()" class="text-xs bg-sky-600 hover:bg-sky-500 text-white px-2.5 py-1 rounded flex items-center space-x-1">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy URL</span>
+                            </button>
+                        </div>
+                    </div>
+                    <pre id="ipxeCodeViewer" class="flex-1 overflow-auto bg-gray-950 p-4 rounded-lg text-xs font-mono text-gray-300 border border-gray-800/80 leading-relaxed"></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: CLIENT LOGS -->
+        <section id="tab-logs" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Client Boot Activity History</h2>
+                    <p class="text-xs text-gray-400">Auditing and diagnostic log for network boot clients hitting PxeWebUI.</p>
+                </div>
+                <button onclick="loadLogs()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg text-xs flex items-center space-x-1.5">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span>Refresh</span>
+                </button>
+            </div>
+
+            <div class="bg-cardbg rounded-xl border border-gray-800 overflow-hidden">
+                <table class="w-full text-left text-sm text-gray-300">
+                    <thead class="bg-gray-900/80 text-xs uppercase tracking-wider text-gray-400 border-b border-gray-800">
+                        <tr>
+                            <th class="px-6 py-3">Timestamp</th>
+                            <th class="px-6 py-3">Client IP</th>
+                            <th class="px-6 py-3">Platform</th>
+                            <th class="px-6 py-3">Requested Resource</th>
+                            <th class="px-6 py-3">Client User-Agent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody" class="divide-y divide-gray-800/60 font-mono text-xs">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- TAB 5: USERS MANAGEMENT -->
+        <section id="tab-users" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-bold text-white">User Accounts & Roles</h2>
+                    <p class="text-xs text-gray-400">Manage administrative and operator accounts for PxeWebUI.</p>
+                </div>
+                <button onclick="openCreateUserModal()" class="bg-sky-600 hover:bg-sky-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5">
+                    <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                    <span>Create User</span>
+                </button>
+            </div>
+
+            <div class="bg-cardbg rounded-xl border border-gray-800 overflow-hidden">
+                <table class="w-full text-left text-sm text-gray-300">
+                    <thead class="bg-gray-900/80 text-xs uppercase tracking-wider text-gray-400 border-b border-gray-800">
+                        <tr>
+                            <th class="px-6 py-3">User</th>
+                            <th class="px-6 py-3">Role</th>
+                            <th class="px-6 py-3">Created</th>
+                            <th class="px-6 py-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody" class="divide-y divide-gray-800/60 text-sm">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- TAB 6: SETTINGS -->
+        <section id="tab-settings" class="hidden space-y-6">
+            <div class="max-w-3xl bg-cardbg rounded-xl border border-gray-800 p-6 space-y-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">PXE & Network Settings</h2>
+                    <p class="text-xs text-gray-400">Configure how PXE network boot communicates with your LAN clients.</p>
+                </div>
+
+                <form id="settingsForm" onsubmit="saveSettings(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Server IP Address (Announced to Clients)</label>
+                        <input type="text" id="settingServerIp" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200 font-mono">
+                        <p class="text-[11px] text-gray-500 mt-1">Clients use this IP address to download <code class="text-sky-400">boot.ipxe</code> and ISO images via HTTP.</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1">HTTP Web & Boot Port</label>
+                            <input type="number" id="settingHttpPort" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200 font-mono" disabled>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-300 mb-1">Boot Menu Timeout (Seconds)</label>
+                            <input type="number" id="settingBootTimeout" min="0" max="60" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Default Boot Target</label>
+                        <select id="settingDefaultAction" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                            <option value="local_disk">Local Drive (Default - boot installed OS)</option>
+                            <option value="first_iso">First Available Enabled ISO</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center space-x-3 p-3 bg-gray-900/60 rounded-lg border border-gray-800">
+                        <input type="checkbox" id="settingProxyDhcp" class="h-4 w-4 text-sky-600 rounded bg-gray-800 border-gray-700">
+                        <div>
+                            <label for="settingProxyDhcp" class="text-xs font-semibold text-gray-200">Enable ProxyDHCP Mode</label>
+                            <p class="text-[11px] text-gray-400">Allows PxeWebUI to serve network boot parameters alongside your existing router DHCP server without conflict!</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Menu Title Displayed to PXE Clients</label>
+                        <input type="text" id="settingMenuTitle" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                    </div>
+
+                    <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium px-5 py-2 rounded-lg text-sm">Save & Apply Settings</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- TAB 7: SETUP GUIDE -->
+        <section id="tab-guide" class="hidden space-y-6">
+            <div class="bg-cardbg rounded-xl border border-gray-800 p-6 space-y-4">
+                <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-sky-400"></i>
+                    <span>Proxmox & Network Boot Client Guide</span>
+                </h2>
+                <p class="text-sm text-gray-300 leading-relaxed">
+                    PxeWebUI operates using <strong>ProxyDHCP</strong>. This means you <strong>do NOT</strong> need to modify your main router or home network settings. When a client boots over PXE, your main router issues the standard IP address, and PxeWebUI responds concurrently on port 67/4011 with the bootloader file!
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    <div class="bg-gray-900/80 p-4 rounded-xl border border-gray-800">
+                        <h3 class="font-semibold text-sky-400 mb-2 flex items-center space-x-2">
+                            <i data-lucide="cpu" class="w-4 h-4"></i>
+                            <span>How to Boot a Physical Machine</span>
+                        </h3>
+                        <ol class="list-decimal list-inside text-xs text-gray-300 space-y-2">
+                            <li>Connect the machine to the same network (Ethernet cable recommended).</li>
+                            <li>Power on and press the Boot Menu key (<kbd class="px-1.5 py-0.5 bg-gray-800 rounded">F12</kbd>, <kbd class="px-1.5 py-0.5 bg-gray-800 rounded">F11</kbd>, <kbd class="px-1.5 py-0.5 bg-gray-800 rounded">F8</kbd> or <kbd class="px-1.5 py-0.5 bg-gray-800 rounded">Esc</kbd>).</li>
+                            <li>Select <strong>Network Boot / Onboard NIC / IPv4 PXE</strong>.</li>
+                            <li>The machine will load iPXE and display your customized PxeWebUI boot menu!</li>
+                        </ol>
+                    </div>
+
+                    <div class="bg-gray-900/80 p-4 rounded-xl border border-gray-800">
+                        <h3 class="font-semibold text-emerald-400 mb-2 flex items-center space-x-2">
+                            <i data-lucide="shield-check" class="w-4 h-4"></i>
+                            <span>UEFI & Secure Boot Compatibility</span>
+                        </h3>
+                        <ul class="list-disc list-inside text-xs text-gray-300 space-y-2">
+                            <li><strong>Legacy BIOS:</strong> Boots via <code class="text-sky-300">undionly.kpxe</code> + Syslinux memdisk.</li>
+                            <li><strong>UEFI x86_64:</strong> Boots via <code class="text-sky-300">ipxe.efi</code> with HTTP sanboot.</li>
+                            <li><strong>Secure Boot:</strong> Compatible via Microsoft-signed shim + GRUB chainloader.</li>
+                            <li><strong>Windows Installers:</strong> Uses <code class="text-sky-300">wimboot</code> to load WinPE over network.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL: ADD ISO (DOWNLOAD OR UPLOAD) -->
+    <div id="addIsoModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardbg border border-gray-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="disc" class="w-5 h-5 text-sky-400"></i>
+                    <span>Add New ISO Image</span>
+                </h3>
+                <button onclick="closeAddIsoModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Tab Switcher: URL Download vs File Upload -->
+            <div class="grid grid-cols-2 gap-2 p-1 bg-gray-900 rounded-lg text-xs font-semibold">
+                <button id="addModalTabDl" onclick="switchAddModalTab('download')" class="py-2 rounded-md bg-sky-600 text-white flex items-center justify-center space-x-2">
+                    <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                    <span>Download from URL</span>
+                </button>
+                <button id="addModalTabUp" onclick="switchAddModalTab('upload')" class="py-2 rounded-md text-gray-400 hover:text-white flex items-center justify-center space-x-2">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>Upload Local File</span>
+                </button>
+            </div>
+
+            <!-- TAB 1 CONTENT: REMOTE DOWNLOAD -->
+            <form id="downloadIsoForm" onsubmit="submitDownloadIso(event)" class="space-y-4">
+                <!-- Preset Picker -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Quick Presets (Popular Operating Systems)</label>
+                    <select id="presetSelect" onchange="applyPreset()" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-sky-300">
+                        <option value="">-- Choose an OS to auto-fill --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">ISO Download URL <span class="text-rose-500">*</span></label>
+                    <input type="url" id="dlUrl" required placeholder="https://releases.ubuntu.com/24.04/ubuntu-server-amd64.iso" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Display Title</label>
+                        <input type="text" id="dlTitle" placeholder="Ubuntu Server 24.04 LTS" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Category</label>
+                        <select id="dlCategory" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                            <option value="linux">Linux</option>
+                            <option value="windows">Windows</option>
+                            <option value="hypervisor">Hypervisor</option>
+                            <option value="utility">Utility / Rescue</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Description</label>
+                    <input type="text" id="dlDesc" placeholder="Automated cloud-init server installer" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Boot Mode</label>
+                        <select id="dlBootMode" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                            <option value="sanboot">iPXE sanboot (Universal ISO Boot)</option>
+                            <option value="memdisk">Syslinux memdisk (Legacy RAM Disk)</option>
+                            <option value="wimboot">wimboot (Windows PE / Setup)</option>
+                            <option value="kernel_initrd">Extracted Kernel & Initrd</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-2 pt-6">
+                        <input type="checkbox" id="dlSecureBoot" class="h-4 w-4 text-sky-600 rounded bg-gray-800 border-gray-700">
+                        <label for="dlSecureBoot" class="text-xs text-gray-300">Secure Boot Compatible</label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeAddIsoModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg font-medium">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm rounded-lg font-medium flex items-center space-x-1.5">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>Start Background Download</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- TAB 2 CONTENT: LOCAL UPLOAD -->
+            <form id="uploadIsoForm" onsubmit="submitUploadIso(event)" class="hidden space-y-4">
+                <div class="border-2 border-dashed border-gray-700 hover:border-sky-500 rounded-xl p-6 text-center cursor-pointer transition" onclick="document.getElementById('uploadFile').click()">
+                    <i data-lucide="upload-cloud" class="w-10 h-10 text-gray-500 mx-auto mb-2"></i>
+                    <p class="text-sm font-medium text-gray-300">Click to browse or drag & drop ISO here</p>
+                    <p class="text-xs text-gray-500 mt-1" id="uploadFileLabel">Supports .iso and .img files</p>
+                    <input type="file" id="uploadFile" accept=".iso,.img" required class="hidden" onchange="onFileSelected(this)">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Display Title</label>
+                        <input type="text" id="upTitle" placeholder="e.g. Proxmox VE 8.2" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Category</label>
+                        <select id="upCategory" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                            <option value="linux">Linux</option>
+                            <option value="windows">Windows</option>
+                            <option value="hypervisor">Hypervisor</option>
+                            <option value="utility">Utility</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Description</label>
+                    <input type="text" id="upDesc" placeholder="e.g. Custom rescue environment" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="uploadProgressContainer" class="hidden space-y-1">
+                    <div class="flex justify-between text-xs text-gray-400">
+                        <span>Uploading...</span>
+                        <span id="uploadPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                        <div id="uploadProgressBar" class="bg-sky-500 h-2 w-0 transition-all duration-150"></div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeAddIsoModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg font-medium">Cancel</button>
+                    <button type="submit" id="uploadSubmitBtn" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm rounded-lg font-medium flex items-center space-x-1.5">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        <span>Upload to Server</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT ISO -->
+    <div id="editIsoModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardbg border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="edit-3" class="w-5 h-5 text-sky-400"></i>
+                    <span>Edit ISO Configuration</span>
+                </h3>
+                <button onclick="closeEditIsoModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="editIsoForm" onsubmit="submitEditIso(event)" class="space-y-4">
+                <input type="hidden" id="editIsoId">
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Display Title</label>
+                    <input type="text" id="editTitle" required class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Description</label>
+                    <textarea id="editDesc" rows="2" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Category</label>
+                        <select id="editCategory" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                            <option value="linux">Linux</option>
+                            <option value="windows">Windows</option>
+                            <option value="hypervisor">Hypervisor</option>
+                            <option value="utility">Utility</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Boot Method</label>
+                        <select id="editBootMode" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                            <option value="sanboot">iPXE sanboot (HTTP ISO boot)</option>
+                            <option value="memdisk">Syslinux memdisk (Legacy RAM)</option>
+                            <option value="wimboot">wimboot (Windows PE)</option>
+                            <option value="kernel_initrd">Direct Kernel / Initrd</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Custom iPXE commands (optional) -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Custom iPXE Script Lines (Optional)</label>
+                    <textarea id="editCustomIpxe" rows="2" placeholder="Leave empty for auto-generation" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-xs font-mono text-gray-300"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 pt-1">
+                    <label class="flex items-center space-x-2 text-xs text-gray-300">
+                        <input type="checkbox" id="editArchBios" class="h-4 w-4 text-sky-600 rounded bg-gray-800 border-gray-700">
+                        <span>BIOS Compatible</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-gray-300">
+                        <input type="checkbox" id="editArchUefi" class="h-4 w-4 text-sky-600 rounded bg-gray-800 border-gray-700">
+                        <span>UEFI x64 Compatible</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-gray-300">
+                        <input type="checkbox" id="editSecureBoot" class="h-4 w-4 text-sky-600 rounded bg-gray-800 border-gray-700">
+                        <span>Secure Boot Capable</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-gray-300">
+                        <input type="checkbox" id="editIsDefault" class="h-4 w-4 text-sky-600 rounded bg-gray-800 border-gray-700">
+                        <span>Set as Default Boot Item</span>
+                    </label>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-3">
+                    <button type="button" onclick="closeEditIsoModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg font-medium">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm rounded-lg font-medium">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: CREATE USER -->
+    <div id="createUserModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-cardbg border border-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="user-plus" class="w-5 h-5 text-sky-400"></i>
+                    <span>Create User Account</span>
+                </h3>
+                <button onclick="closeCreateUserModal()" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="createUserForm" onsubmit="submitCreateUser(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Username</label>
+                    <input type="text" id="newUsername" required class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Password</label>
+                    <input type="password" id="newPassword" required minlength="6" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Role</label>
+                    <select id="newRole" class="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-200">
+                        <option value="admin">Administrator (Full Access)</option>
+                        <option value="operator">Operator (Add & Edit ISOs)</option>
+                        <option value="viewer">Viewer (Read Only)</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeCreateUserModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg font-medium">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm rounded-lg font-medium">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: LOGIN (SHOWN IF UNAUTHENTICATED) -->
+    <div id="loginModal" class="fixed inset-0 bg-darkbg z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel border border-gray-800 rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
+            <div class="text-center space-y-2">
+                <div class="h-14 w-14 mx-auto rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center shadow-xl shadow-sky-500/25">
+                    <i data-lucide="server" class="w-8 h-8 text-white"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white tracking-tight">Sign In to PxeWebUI</h2>
+                <p class="text-xs text-gray-400">Network Boot Environment Management Server</p>
+            </div>
+
+            <!-- Default credentials hint banner -->
+            <div class="bg-sky-950/40 border border-sky-800/60 rounded-xl p-3 text-xs text-sky-300 flex items-start space-x-2">
+                <i data-lucide="info" class="w-4 h-4 text-sky-400 shrink-0 mt-0.5"></i>
+                <div>
+                    <span class="font-bold">Default Credentials:</span><br>
+                    Username: <code class="text-white font-mono font-bold">Admin</code> | Password: <code class="text-white font-mono font-bold">PxeWebUIadmin</code>
+                    <button type="button" onclick="fillDefaultCreds()" class="block mt-1 text-sky-400 underline font-semibold">Click here to auto-fill</button>
+                </div>
+            </div>
+
+            <form id="loginForm" onsubmit="submitLogin(event)" class="space-y-4">
+                <div id="loginError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/60 rounded-lg p-2.5"></div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Username</label>
+                    <input type="text" id="loginUsername" required class="w-full px-3.5 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-sm text-gray-200 focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-300 mb-1">Password</label>
+                    <input type="password" id="loginPassword" required class="w-full px-3.5 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-sm text-gray-200 focus:outline-none focus:border-sky-500">
+                </div>
+
+                <button type="submit" class="w-full py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-sky-600/30 transition">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="/js/app.js"></script>
+    <script>
+        // Init Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>

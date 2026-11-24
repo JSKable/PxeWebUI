@@ -1,0 +1,7 @@
+/target
+data/
+isos/*.iso
+isos/*.img
+.git
+.gitignore
+*.md
