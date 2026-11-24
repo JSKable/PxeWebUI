@@ -8,6 +8,7 @@ impl PxeGenerator {
         isos: &[Iso],
         server_ip: &str,
         http_port: u16,
+        custom_base_url: Option<&str>,
     ) -> String {
         let mut script = String::new();
 
@@ -26,10 +27,14 @@ impl PxeGenerator {
         script.push_str("colour --rgb 0x22c55e 3 ||\n"); // Green-500
         script.push_str("colour --rgb 0xef4444 4 ||\n\n"); // Red-500
 
-        // Server Variables
-        script.push_str(&format!("set server_ip {}\n", server_ip));
-        script.push_str(&format!("set server_port {}\n", http_port));
-        script.push_str("set base_url http://${server_ip}:${server_port}\n\n");
+        // Server Variables (Dynamic Base URL supporting public domains & local LAN)
+        if let Some(base) = custom_base_url {
+            script.push_str(&format!("set base_url {}\n\n", base));
+        } else {
+            script.push_str(&format!("set server_ip {}\n", server_ip));
+            script.push_str(&format!("set server_port {}\n", http_port));
+            script.push_str("set base_url http://${server_ip}:${server_port}\n\n");
+        }
 
         // Timeout and default action
         let timeout_ms = settings.boot_timeout * 1000;

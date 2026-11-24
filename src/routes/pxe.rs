@@ -56,11 +56,24 @@ pub async fn get_boot_ipxe(
         .log_client_access(client_ip, user_agent, "/boot.ipxe", platform)
         .ok();
 
+    // Determine base URL dynamically (supports public domains like pxe.jskable.com and reverse proxies)
+    let custom_base_url = if let Some(host) = headers.get(header::HOST).and_then(|h| h.to_str().ok()) {
+        let proto = if headers.get("x-forwarded-proto").and_then(|h| h.to_str().ok()) == Some("https") {
+            "https"
+        } else {
+            "http"
+        };
+        Some(format!("{}://{}", proto, host))
+    } else {
+        None
+    };
+
     let script = PxeGenerator::generate_ipxe_script(
         &settings,
         &isos,
         &settings.server_ip,
         settings.http_port,
+        custom_base_url.as_deref(),
     );
 
     (
@@ -229,6 +242,7 @@ pub async fn get_pxe_preview(
         &isos,
         &settings.server_ip,
         settings.http_port,
+        None,
     );
 
     let grub = PxeGenerator::generate_grub_cfg(
