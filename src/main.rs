@@ -25,8 +25,8 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use sysinfo::System;
+use axum::extract::DefaultBodyLimit;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::limit::DefaultBodyLimit;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 

@@ -144,7 +144,7 @@ pub async fn serve_iso(
         )
         .ok();
 
-    let file = File::open(&file_path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut file = File::open(&file_path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let metadata = file.metadata().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let total_len = metadata.len();
 
@@ -153,7 +153,6 @@ pub async fn serve_iso(
         if let Some(range) = parse_range_header(range_header, total_len) {
             use std::io::SeekFrom;
             use tokio::io::AsyncSeekExt;
-            let mut file = file;
             if file.seek(SeekFrom::Start(range.start)).await.is_ok() {
                 let length = range.end - range.start + 1;
                 let limited = tokio::io::AsyncReadExt::take(file, length);
@@ -169,6 +168,8 @@ pub async fn serve_iso(
                     .header(header::ACCEPT_RANGES, "bytes")
                     .body(body)
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
+            } else {
+                return Err(StatusCode::RANGE_NOT_SATISFIABLE);
             }
         }
     }

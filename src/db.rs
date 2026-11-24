@@ -2,7 +2,7 @@ use crate::models::{ClientLog, Iso, Settings, User};
 use rusqlite::{params, Connection, Result};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct Database {

@@ -168,7 +168,6 @@ impl DownloadManager {
 
         let mut stream = response.bytes_stream();
         let mut downloaded: u64 = 0;
-        let start_time = Instant::now();
         let mut last_update = Instant::now();
         let mut last_bytes = 0u64;
 

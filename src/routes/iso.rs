@@ -9,7 +9,7 @@ use axum::{
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tracing::{error, info};
+use tracing::info;
 
 #[derive(Clone)]
 pub struct IsoState {

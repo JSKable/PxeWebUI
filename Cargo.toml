@@ -9,8 +9,7 @@ description = "Modern and sleek Web UI and PXE Server for network booting ISOs"
 # Web framework & async runtime
 axum = { version = "0.7", features = ["multipart"] }
 tokio = { version = "1.36", features = ["full"] }
-tower = "0.4"
-tower-http = { version = "0.5", features = ["fs", "cors", "trace", "compression-gzip", "limit"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace", "compression-gzip"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -27,7 +26,6 @@ tokio-util = { version = "0.7", features = ["io"] }
 # Authentication & Crypto
 bcrypt = "0.15"
 base64 = "0.22"
-rand = "0.8"
 
 # Utilities & System Monitoring
 chrono = { version = "0.4", features = ["serde"] }
@@ -38,7 +36,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rust-embed = { version = "8.3", features = ["compression"] }
 mime_guess = "2.0"
 uuid = { version = "1.7", features = ["v4", "serde"] }
-regex = "1.10"
 local-ip-address = "0.6"
 
 [profile.release]

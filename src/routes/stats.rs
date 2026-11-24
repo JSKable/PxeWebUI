@@ -32,10 +32,10 @@ pub async fn get_stats(
     State(state): State<StatsState>,
 ) -> Result<Json<SystemStats>, (StatusCode, Json<serde_json::Value>)> {
     let mut sys = state.sysinfo.lock().unwrap();
-    sys.refresh_cpu_all();
+    sys.refresh_cpu_usage();
     sys.refresh_memory();
 
-    let cpu_usage = sys.global_cpu_usage();
+    let cpu_usage = sys.global_cpu_info().cpu_usage();
     let ram_used_mb = sys.used_memory() / (1024 * 1024);
     let ram_total_mb = sys.total_memory() / (1024 * 1024);
 
@@ -49,22 +49,21 @@ pub async fn get_stats(
         .canonicalize()
         .unwrap_or_else(|_| state.config.iso_dir.clone());
 
-    if let Ok(disks) = Disks::new_with_refreshed_list() {
-        let mut found_disk = false;
-        for disk in &disks {
-            if canonical_iso_dir.starts_with(disk.mount_point()) {
-                disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
-                disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
-                found_disk = true;
-                break;
-            }
+    let disks = Disks::new_with_refreshed_list();
+    let mut found_disk = false;
+    for disk in &disks {
+        if canonical_iso_dir.starts_with(disk.mount_point()) {
+            disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+            disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+            found_disk = true;
+            break;
         }
+    }
 
-        if !found_disk {
-            if let Some(disk) = disks.first() {
-                disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
-                disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
-            }
+    if !found_disk {
+        if let Some(disk) = disks.first() {
+            disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+            disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
         }
     }
 
