@@ -24,6 +24,9 @@ impl DnsmasqManager {
         conf.push_str("log-dhcp\n");
         conf.push_str("log-facility=-\n\n");
 
+        // Prevent option packing into boot filename field (critical for Intel Boot Agent)
+        conf.push_str("dhcp-no-override\n\n");
+
         // Enable TFTP Server
         conf.push_str("enable-tftp\n");
         conf.push_str(&format!("tftp-root={}\n\n", tftp_path));
@@ -35,7 +38,6 @@ impl DnsmasqManager {
 
         // Tag client architectures (RFC 4578 / DHCP Option 93)
         conf.push_str("# Client Architecture Tags\n");
-        conf.push_str("dhcp-match=set:bios,option:client-arch,0\n");
         conf.push_str("dhcp-match=set:efi32,option:client-arch,6\n");
         conf.push_str("dhcp-match=set:efi64,option:client-arch,7\n");
         conf.push_str("dhcp-match=set:efi64,option:client-arch,9\n");
@@ -45,27 +47,34 @@ impl DnsmasqManager {
         conf.push_str("# Detect if client is already running iPXE\n");
         conf.push_str("dhcp-userclass=set:ipxe,iPXE\n\n");
 
-        // Chainload to HTTP boot.ipxe if iPXE is running
+        // PXE Prompt (immediately select default without delay)
+        conf.push_str("pxe-prompt=\"Booting PxeWebUI...\",1\n\n");
+
+        // PXE Service Menu entries for ProxyDHCP clients
+        // Do NOT use tag: on pxe-service - the architecture keyword is the matching condition!
+        conf.push_str("# PXE Service Menu (for legacy/UEFI proxyDHCP discovery)\n");
+        conf.push_str(&format!("pxe-service=x86PC,\"PxeWebUI (Legacy BIOS)\",undionly.kpxe,{}\n", server_ip));
+        conf.push_str(&format!("pxe-service=X86-64_EFI,\"PxeWebUI (UEFI x64)\",ipxe.efi,{}\n", server_ip));
+        conf.push_str(&format!("pxe-service=BC_EFI,\"PxeWebUI (UEFI BC)\",ipxe.efi,{}\n", server_ip));
+        conf.push_str(&format!("pxe-service=IA32_EFI,\"PxeWebUI (UEFI 32-bit)\",ipxe-i386.efi,{}\n", server_ip));
+        conf.push_str(&format!("pxe-service=ARM64_EFI,\"PxeWebUI (UEFI ARM64)\",ipxe-arm64.efi,{}\n\n", server_ip));
+
+        // Chainload to HTTP boot.ipxe if iPXE is already running
         conf.push_str("# If client is already iPXE, point to PxeWebUI dynamic menu\n");
         conf.push_str(&format!(
             "dhcp-boot=tag:ipxe,http://{}:{}/boot.ipxe\n\n",
             server_ip, http_port
         ));
 
-        // Otherwise deliver architecture-specific bootloader via TFTP
+        // Architecture-specific TFTP Bootloaders
         conf.push_str("# Architecture-specific TFTP Bootloaders\n");
-        conf.push_str("dhcp-boot=tag:bios,undionly.kpxe\n");
-        conf.push_str("dhcp-boot=tag:efi32,ipxe-i386.efi\n");
-        conf.push_str("dhcp-boot=tag:efi64,ipxe.efi\n");
-        conf.push_str("dhcp-boot=tag:efiarm64,ipxe-arm64.efi\n\n");
+        conf.push_str(&format!("dhcp-boot=tag:efi64,ipxe.efi,,{}\n", server_ip));
+        conf.push_str(&format!("dhcp-boot=tag:efi32,ipxe-i386.efi,,{}\n", server_ip));
+        conf.push_str(&format!("dhcp-boot=tag:efiarm64,ipxe-arm64.efi,,{}\n\n", server_ip));
 
-        // PXE Service Menu entries for ProxyDHCP clients
-        conf.push_str("# PXE Service Menu (for legacy/UEFI proxyDHCP discovery)\n");
-        conf.push_str("pxe-service=tag:bios,x86PC,\"PxeWebUI (Legacy BIOS)\",undionly.kpxe\n");
-        conf.push_str("pxe-service=tag:efi64,X86-64_EFI,\"PxeWebUI (UEFI x64)\",ipxe.efi\n");
-        conf.push_str("pxe-service=tag:efi64,BC_EFI,\"PxeWebUI (UEFI BC)\",ipxe.efi\n");
-        conf.push_str("pxe-service=tag:efi32,6,\"PxeWebUI (UEFI 32-bit)\",ipxe-i386.efi\n");
-        conf.push_str("pxe-service=tag:efiarm64,11,\"PxeWebUI (UEFI ARM64)\",ipxe-arm64.efi\n");
+        // Default fallback (Legacy BIOS and clients that do not send Option 93)
+        conf.push_str("# Universal Fallback for Legacy BIOS\n");
+        conf.push_str(&format!("dhcp-boot=undionly.kpxe,,{}\n", server_ip));
 
         conf
     }

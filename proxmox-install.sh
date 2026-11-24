@@ -219,14 +219,14 @@ cat <<EOF > "$DNSMASQ_CONF"
 port=0
 log-dhcp
 log-facility=-
+dhcp-no-override
 enable-tftp
 tftp-root=$TFTP_DIR
 
 # ProxyDHCP Mode
 dhcp-range=$HOST_IP,proxy
 
-# Client Architectures
-dhcp-match=set:bios,option:client-arch,0
+# Client Architectures (RFC 4578 / Option 93)
 dhcp-match=set:efi32,option:client-arch,6
 dhcp-match=set:efi64,option:client-arch,7
 dhcp-match=set:efi64,option:client-arch,9
@@ -235,15 +235,26 @@ dhcp-match=set:efiarm64,option:client-arch,11
 # iPXE userclass
 dhcp-userclass=set:ipxe,iPXE
 
-dhcp-boot=tag:ipxe,http://$HOST_IP:8080/boot.ipxe
-dhcp-boot=tag:bios,undionly.kpxe
-dhcp-boot=tag:efi32,ipxe-i386.efi
-dhcp-boot=tag:efi64,ipxe.efi
-dhcp-boot=tag:efiarm64,ipxe-arm64.efi
+# PXE Prompt
+pxe-prompt="Booting PxeWebUI...",1
 
-pxe-service=tag:bios,x86PC,"PxeWebUI (Legacy BIOS)",undionly.kpxe
-pxe-service=tag:efi64,X86-64_EFI,"PxeWebUI (UEFI x64)",ipxe.efi
-pxe-service=tag:efi64,BC_EFI,"PxeWebUI (UEFI BC)",ipxe.efi
+# PXE Service Menu for ProxyDHCP
+pxe-service=x86PC,"PxeWebUI (Legacy BIOS)",undionly.kpxe,$HOST_IP
+pxe-service=X86-64_EFI,"PxeWebUI (UEFI x64)",ipxe.efi,$HOST_IP
+pxe-service=BC_EFI,"PxeWebUI (UEFI BC)",ipxe.efi,$HOST_IP
+pxe-service=IA32_EFI,"PxeWebUI (UEFI 32-bit)",ipxe-i386.efi,$HOST_IP
+pxe-service=ARM64_EFI,"PxeWebUI (UEFI ARM64)",ipxe-arm64.efi,$HOST_IP
+
+# If client is already running iPXE, chainload directly to dynamic menu
+dhcp-boot=tag:ipxe,http://$HOST_IP:8080/boot.ipxe
+
+# Architecture-specific TFTP Bootloaders
+dhcp-boot=tag:efi64,ipxe.efi,,$HOST_IP
+dhcp-boot=tag:efi32,ipxe-i386.efi,,$HOST_IP
+dhcp-boot=tag:efiarm64,ipxe-arm64.efi,,$HOST_IP
+
+# Default Fallback for Legacy BIOS
+dhcp-boot=undionly.kpxe,,$HOST_IP
 EOF
 
 # Disable default system dnsmasq to avoid conflict with our managed instance

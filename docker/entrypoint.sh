@@ -42,6 +42,7 @@ if [ ! -f "$DNSMASQ_CONF" ]; then
 port=0
 log-dhcp
 log-facility=-
+dhcp-no-override
 enable-tftp
 tftp-root=$TFTP_DIR
 
@@ -49,7 +50,6 @@ tftp-root=$TFTP_DIR
 dhcp-range=$PXE_SERVER_IP,proxy
 
 # Client Architecture Matching (RFC 4578)
-dhcp-match=set:bios,option:client-arch,0
 dhcp-match=set:efi32,option:client-arch,6
 dhcp-match=set:efi64,option:client-arch,7
 dhcp-match=set:efi64,option:client-arch,9
@@ -58,21 +58,26 @@ dhcp-match=set:efiarm64,option:client-arch,11
 # iPXE user class detection
 dhcp-userclass=set:ipxe,iPXE
 
+# PXE Prompt
+pxe-prompt="Booting PxeWebUI...",1
+
+# PXE Service Menu for ProxyDHCP
+pxe-service=x86PC,"PxeWebUI (Legacy BIOS)",undionly.kpxe,$PXE_SERVER_IP
+pxe-service=X86-64_EFI,"PxeWebUI (UEFI x64)",ipxe.efi,$PXE_SERVER_IP
+pxe-service=BC_EFI,"PxeWebUI (UEFI BC)",ipxe.efi,$PXE_SERVER_IP
+pxe-service=IA32_EFI,"PxeWebUI (UEFI 32-bit)",ipxe-i386.efi,$PXE_SERVER_IP
+pxe-service=ARM64_EFI,"PxeWebUI (UEFI ARM64)",ipxe-arm64.efi,$PXE_SERVER_IP
+
 # If client is already running iPXE, chainload directly to WebUI dynamic menu
 dhcp-boot=tag:ipxe,http://$PXE_SERVER_IP:$HTTP_PORT/boot.ipxe
 
-# Initial TFTP Bootloaders
-dhcp-boot=tag:bios,undionly.kpxe
-dhcp-boot=tag:efi32,ipxe-i386.efi
-dhcp-boot=tag:efi64,ipxe.efi
-dhcp-boot=tag:efiarm64,ipxe-arm64.efi
+# Architecture-specific TFTP Bootloaders
+dhcp-boot=tag:efi64,ipxe.efi,,$PXE_SERVER_IP
+dhcp-boot=tag:efi32,ipxe-i386.efi,,$PXE_SERVER_IP
+dhcp-boot=tag:efiarm64,ipxe-arm64.efi,,$PXE_SERVER_IP
 
-# PXE Service Menu for ProxyDHCP
-pxe-service=tag:bios,x86PC,"PxeWebUI (Legacy BIOS)",undionly.kpxe
-pxe-service=tag:efi64,X86-64_EFI,"PxeWebUI (UEFI x64)",ipxe.efi
-pxe-service=tag:efi64,BC_EFI,"PxeWebUI (UEFI BC)",ipxe.efi
-pxe-service=tag:efi32,6,"PxeWebUI (UEFI 32-bit)",ipxe-i386.efi
-pxe-service=tag:efiarm64,11,"PxeWebUI (UEFI ARM64)",ipxe-arm64.efi
+# Default Fallback for Legacy BIOS
+dhcp-boot=undionly.kpxe,,$PXE_SERVER_IP
 EOF
 fi
 
