@@ -1,6 +1,6 @@
 use crate::auth::{AuthUser, SessionManager};
 use crate::db::Database;
-use crate::models::{CreateUserRequest, User};
+use crate::models::User;
 use axum::{
     extract::State,
     http::{header, HeaderMap, StatusCode},

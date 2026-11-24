@@ -4,16 +4,14 @@ use crate::db::Database;
 use crate::services::pxe_generator::PxeGenerator;
 use axum::{
     body::Body,
-    extract::{ConnectInfo, Path, State},
+    extract::{Path, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
-use tracing::info;
 
 #[derive(Clone)]
 pub struct PxeState {
@@ -118,6 +116,10 @@ pub async fn serve_iso(
     Path(filename): Path<String>,
     headers: HeaderMap,
 ) -> Result<Response, StatusCode> {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let file_path = state.iso_dir.join(&filename);
     if !file_path.exists() || !file_path.is_file() {
         return Err(StatusCode::NOT_FOUND);
@@ -187,6 +189,10 @@ pub async fn serve_tftp_file(
     State(state): State<PxeState>,
     Path(filename): Path<String>,
 ) -> Result<Response, StatusCode> {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let file_path = state.tftp_dir.join(&filename);
     if !file_path.exists() || !file_path.is_file() {
         return Err(StatusCode::NOT_FOUND);

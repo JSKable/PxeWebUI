@@ -2,7 +2,7 @@ use crate::db::Database;
 use crate::models::{DownloadTask, Iso, IsoPreset, StartDownloadRequest};
 use futures_util::StreamExt;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::fs::File;

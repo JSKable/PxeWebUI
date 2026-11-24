@@ -108,12 +108,13 @@ if [ "$IS_PVE_HOST" = true ]; then
     echo -e "${CYAN}Installing PxeWebUI inside LXC container $CT_ID...${NC}"
 
     # Push and run installation inside the container
-    pct exec "$CT_ID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/JSKable/PxeWebUI/main/proxmox-install.sh 2>/dev/null || cat << 'EOF'
-        # Fallback inline container install
-        apt-get update && apt-get install -y --no-install-recommends \
-            curl wget ca-certificates dnsmasq syslinux-common iproute2
-EOF
-    )"
+    if [ -f "$0" ] && [ "$0" != "bash" ] && [ "$0" != "-bash" ]; then
+        echo -e "${CYAN}Pushing installer script to container...${NC}"
+        pct push "$CT_ID" "$0" /tmp/proxmox-install.sh
+        pct exec "$CT_ID" -- bash /tmp/proxmox-install.sh
+    else
+        pct exec "$CT_ID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/JSKable/PxeWebUI/main/proxmox-install.sh)"
+    fi
 
     echo ""
     echo -e "${GREEN}==========================================================${NC}"
@@ -146,7 +147,11 @@ apt-get install -y --no-install-recommends \
     dnsmasq \
     syslinux-common \
     iproute2 \
-    tar
+    tar \
+    git \
+    build-essential \
+    pkg-config \
+    libssl-dev
 
 INSTALL_DIR="/opt/pxewebui"
 DATA_DIR="/var/lib/pxewebui/data"
@@ -166,6 +171,14 @@ elif [ -f "./pxewebui" ]; then
     cp -r "./tftp" "$INSTALL_DIR/" 2>/dev/null || true
 else
     echo -e "${YELLOW}Building or fetching PxeWebUI release binary...${NC}"
+    # If not inside repository root, clone source from GitHub
+    if [ ! -f "./Cargo.toml" ]; then
+        echo -e "${CYAN}Cloning PxeWebUI source repository...${NC}"
+        rm -rf /tmp/pxewebui-src
+        git clone https://github.com/JSKable/PxeWebUI.git /tmp/pxewebui-src
+        cd /tmp/pxewebui-src
+    fi
+
     # If cargo is installed, build it
     if command -v cargo >/dev/null 2>&1; then
         cargo build --release

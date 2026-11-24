@@ -6,6 +6,7 @@ let allPresets = [];
 let currentCategory = 'all';
 let statsPollInterval = null;
 let downloadsPollInterval = null;
+const knownCompletedDownloadIds = new Set();
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -286,14 +287,17 @@ function renderIsos() {
     lucide.createIcons();
 }
 
-function setCategoryFilter(cat) {
+function setCategoryFilter(cat, elem) {
     currentCategory = cat;
     document.querySelectorAll('.cat-pill').forEach(btn => {
         btn.classList.remove('bg-sky-600', 'text-white');
         btn.classList.add('bg-gray-900', 'text-gray-400');
     });
-    event.target.classList.add('bg-sky-600', 'text-white');
-    event.target.classList.remove('bg-gray-900', 'text-gray-400');
+    const target = elem || (typeof event !== 'undefined' ? (event.currentTarget || event.target) : null);
+    if (target) {
+        target.classList.add('bg-sky-600', 'text-white');
+        target.classList.remove('bg-gray-900', 'text-gray-400');
+    }
     renderIsos();
 }
 
@@ -578,6 +582,18 @@ async function loadDownloads() {
 
         const tasks = await res.json();
         const activeCount = tasks.filter(t => t.status === 'downloading').length;
+
+        // Auto-refresh ISO library when any download completes
+        let newlyCompleted = false;
+        tasks.forEach(t => {
+            if (t.status === 'completed' && !knownCompletedDownloadIds.has(t.id)) {
+                knownCompletedDownloadIds.add(t.id);
+                newlyCompleted = true;
+            }
+        });
+        if (newlyCompleted) {
+            loadIsos();
+        }
 
         const badge = document.getElementById('downloadCountBadge');
         if (activeCount > 0) {

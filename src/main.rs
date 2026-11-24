@@ -179,12 +179,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/users/:id", put(update_user).delete(delete_user))
         // ISO Management API
         .route("/api/isos", get(list_isos))
-        .route("/api/isos/:id", get(get_iso).put(update_iso).delete(delete_iso))
         .route("/api/isos/upload", post(upload_iso))
+        .route("/api/isos/:id", get(get_iso).put(update_iso).delete(delete_iso))
         // Downloads API
         .route("/api/downloads", get(list_downloads).post(start_download))
-        .route("/api/downloads/:id", delete(cancel_download))
         .route("/api/downloads/presets", get(get_presets))
+        .route("/api/downloads/:id", delete(cancel_download))
         // Settings API
         .route("/api/settings", get(get_settings).put(update_settings))
         // Stats & Client Logs

@@ -39,7 +39,6 @@ pub async fn get_stats(
     let ram_used_mb = sys.used_memory() / (1024 * 1024);
     let ram_total_mb = sys.total_memory() / (1024 * 1024);
 
-    let disks = Disks::new_with_refreshed_list();
     let mut disk_free_gb = 0.0;
     let mut disk_total_gb = 0.0;
 
@@ -50,20 +49,22 @@ pub async fn get_stats(
         .canonicalize()
         .unwrap_or_else(|_| state.config.iso_dir.clone());
 
-    let mut found_disk = false;
-    for disk in &disks {
-        if canonical_iso_dir.starts_with(disk.mount_point()) {
-            disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
-            disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
-            found_disk = true;
-            break;
+    if let Ok(disks) = Disks::new_with_refreshed_list() {
+        let mut found_disk = false;
+        for disk in &disks {
+            if canonical_iso_dir.starts_with(disk.mount_point()) {
+                disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+                disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+                found_disk = true;
+                break;
+            }
         }
-    }
 
-    if !found_disk {
-        if let Some(disk) = disks.first() {
-            disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
-            disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+        if !found_disk {
+            if let Some(disk) = disks.first() {
+                disk_free_gb = (disk.available_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+                disk_total_gb = (disk.total_space() as f64) / (1024.0 * 1024.0 * 1024.0);
+            }
         }
     }
 
