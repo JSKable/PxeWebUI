@@ -108,7 +108,7 @@ if [ "$IS_PVE_HOST" = true ]; then
     echo -e "${CYAN}Installing PxeWebUI inside LXC container $CT_ID...${NC}"
 
     # Push and run installation inside the container
-    pct exec "$CT_ID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/PxeWebUI/PxeWebUI/main/proxmox-install.sh 2>/dev/null || cat << 'EOF'
+    pct exec "$CT_ID" -- bash -c "$(curl -fsSL https://raw.githubusercontent.com/JSKable/PxeWebUI/main/proxmox-install.sh 2>/dev/null || cat << 'EOF'
         # Fallback inline container install
         apt-get update && apt-get install -y --no-install-recommends \
             curl wget ca-certificates dnsmasq syslinux-common iproute2

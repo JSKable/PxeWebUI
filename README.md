@@ -1,7 +1,7 @@
 # PxeWebUI
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PxeWebUI/PxeWebUI/main/static/img/logo.svg" width="96" height="96" alt="PxeWebUI Logo" onerror="this.style.display='none'"/>
+  <img src="https://raw.githubusercontent.com/JSKable/PxeWebUI/main/static/img/logo.svg" width="96" height="96" alt="PxeWebUI Logo" onerror="this.style.display='none'"/>
 </p>
 
 <h3 align="center">Modern & Sleek Web App & PXE Server for Network Booting ISOs</h3>
@@ -48,7 +48,7 @@
 Run this command directly in your **Proxmox VE Shell** (Node -> Shell):
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/PxeWebUI/PxeWebUI/main/proxmox-install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/JSKable/PxeWebUI/main/proxmox-install.sh)"
 ```
 
 The wizard will prompt you for:
@@ -66,7 +66,7 @@ It automatically downloads the latest Debian template, creates a container with 
 Clone this repository and launch with Docker Compose:
 
 ```bash
-git clone https://github.com/PxeWebUI/PxeWebUI.git
+git clone https://github.com/JSKable/PxeWebUI.git
 cd PxeWebUI
 docker compose up -d
 ```
@@ -80,7 +80,7 @@ docker compose up -d
 If you already have a Debian/Ubuntu LXC container or VM:
 
 ```bash
-git clone https://github.com/PxeWebUI/PxeWebUI.git
+git clone https://github.com/JSKable/PxeWebUI.git
 cd PxeWebUI
 sudo bash proxmox-install.sh
 ```
